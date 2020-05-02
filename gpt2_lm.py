@@ -172,7 +172,7 @@ class GPT2LanguageModel(pl.LightningModule):
         """
         sample = collate_tensors(sample)
         tokens, lengths = self.tokenizer.batch_encode(sample["text"])
-        inputs = {"tokens": tokens[:1024]}
+        inputs = {"tokens": tokens}
 
         return inputs
 

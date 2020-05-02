@@ -31,7 +31,7 @@ def collate_jsonl(items, labels):
         elif len(labels) == 2:
             joined_text = "<LABEL> " + str(item[labels[1]]) + "<TARGET> " + str(item[labels[0]])
         
-        collated_dataset.append({"text": joined_text})
+        collated_dataset.append({"text": joined_text[:650]})
     return collated_dataset
 
 def text_dataset(
