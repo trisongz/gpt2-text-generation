@@ -18,6 +18,10 @@ from utils import top_k_top_p_filtering, load_weights_lm_head
 from test_tube import HyperOptArgumentParser
 from torchnlp.encoders import LabelEncoder
 from torchnlp.utils import collate_tensors
+try:
+    import torch_xla.core.xla_model as xm
+except:
+    pass
 
 #class BucketIO(pl.Callback):
 #    def on_train_end(self, trainer):
@@ -40,7 +44,6 @@ class GPT2LanguageModel(pl.LightningModule):
         self.use_tpu = False
         if hparams.tpu_cores >= 1:
             self.use_tpu = True
-            import torch_xla.core.xla_model as xm
         
         # build model
         self.__build_model()
