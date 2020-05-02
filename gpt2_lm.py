@@ -191,12 +191,12 @@ class GPT2LanguageModel(pl.LightningModule):
         model_out = self.forward(**inputs)
         loss_val = self.loss(model_out, inputs)
 
-        if self.use_tpu:
-            loss_val = loss_val.detach().cpu().numpy()
+        #if self.use_tpu:
+        #    loss_val = loss_val.detach().cpu().numpy()
         
         # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
-        elif self.trainer.use_dp or self.trainer.use_ddp2:
-            loss_val = loss_val.unsqueeze(0).cpu().numpy()
+        if self.trainer.use_dp or self.trainer.use_ddp2:
+            loss_val = loss_val.unsqueeze(0)
 
         tqdm_dict = {"train_loss": loss_val}
         output = OrderedDict(
@@ -219,11 +219,11 @@ class GPT2LanguageModel(pl.LightningModule):
         if self.on_gpu:
             loss_val = loss_val.cuda(loss_val.device.index)
         
-        if self.use_tpu:
-            loss_val = loss_val.detach().cpu().numpy()
+        #if self.use_tpu:
+        #    loss_val = loss_val.detach().cpu().numpy()
 
         # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
-        elif self.trainer.use_dp or self.trainer.use_ddp2:
+        if self.trainer.use_dp or self.trainer.use_ddp2:
             loss_val = loss_val.unsqueeze(0)
 
         output = OrderedDict({"val_loss": loss_val})
