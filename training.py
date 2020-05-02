@@ -48,6 +48,7 @@ def main(hparams) -> None:
             accumulate_grad_batches=hparams.accumulate_grad_batches,
             val_percent_check=hparams.val_percent_check,
             num_tpu_cores=hparams.tpu_cores,
+            num_sanity_val_steps=5,
         )
 
         
@@ -147,11 +148,11 @@ if __name__ == "__main__":
 
     # Batching
     parser.add_argument(
-        "--batch_size", default=16, type=int, help="Batch size to be used."
+        "--batch_size", default=1, type=int, help="Batch size to be used."
     )
     parser.add_argument(
         "--accumulate_grad_batches",
-        default=2,
+        default=1,
         type=int,
         help="Accumulated gradients runs K small batches of size N before \
             doing a backwards pass.",
