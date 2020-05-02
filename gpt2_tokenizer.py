@@ -17,7 +17,7 @@ class GPT2TextEncoder(TextEncoder):
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model)
         self.stoi = self.tokenizer.encoder
         self.itos = self.tokenizer.decoder
-        special_tokens_dict = {'pad_token': '<PAD>'}
+        special_tokens_dict = {'pad_token': '<PAD>', 'label': '<LABEL>', 'target': '<TARGET>'}
         num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
         print('We have added', num_added_toks, 'tokens')
         # num_added_toks = self.tokenizer.add_tokens(['<END-VERSE>'])

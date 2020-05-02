@@ -19,6 +19,9 @@ from test_tube import HyperOptArgumentParser
 from torchnlp.encoders import LabelEncoder
 from torchnlp.utils import collate_tensors
 
+#class BucketIO(pl.Callback):
+#    def on_train_end(self, trainer):
+
 
 class GPT2LanguageModel(pl.LightningModule):
     """
@@ -291,6 +294,12 @@ class GPT2LanguageModel(pl.LightningModule):
             "--learning_rate", default=3e-05, type=float, help="Learning rate.",
         )
         # Data Args:
+        parser.add_argument(
+            "--label",
+            default=None,
+            type=str,
+            help="If conditional LM - specify label to read.",
+        )
         parser.add_argument(
             "--train_csv",
             default="data/train_data.csv",

@@ -4,9 +4,18 @@ from datetime import datetime
 import numpy as np
 import torch
 import torch.nn.functional as F
-
-
 from pytorch_lightning.logging import TestTubeLogger
+
+import json
+import os
+from pprint import pprint
+import tensorflow as tf
+from google.cloud import storage
+from google.oauth2 import service_account
+service_account.Credentials.service_account_info = json.load(open('/content/tmp/adc.json', 'r'))
+creds = service_account.Credentials.from_service_account_file('/content/tmp/adc.json')
+GOOGLE_APPLICATION_CREDENTIALS = json.load(open('/content/tmp/adc.json', 'r'))
+storage_client = storage.Client.from_service_account_json('/content/tmp/adc.json')
 
 
 def setup_testube_logger() -> TestTubeLogger:
@@ -24,6 +33,11 @@ def setup_testube_logger() -> TestTubeLogger:
         name="lightning_logs",
     )
 
+def gs_checkpoint(storage_path, local_fn):
+    g_out = '{}/{}'.format(storage_path, local_fn)
+    tf.io.gfile.copy(local_fn, g_out, overwrite=True)
+    pprint('Checkpoint Saved {} to {}'.format(local_fn, g_out))
+    
 
 def top_k_top_p_filtering(
     logits, top_k, top_p, temperature, filter_value=-float("Inf")

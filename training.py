@@ -35,20 +35,39 @@ def main(hparams) -> None:
     # ------------------------
     # 3 INIT TRAINER
     # ------------------------
-    trainer = Trainer(
-        logger=setup_testube_logger(),
-        checkpoint_callback=True,
-        early_stop_callback=early_stop_callback,
-        default_save_path="experiments/",
-        gpus=hparams.gpus,
-        distributed_backend=hparams.distributed_backend,
-        use_amp=hparams.use_16bit,
-        max_epochs=hparams.max_epochs,
-        min_epochs=hparams.min_epochs,
-        accumulate_grad_batches=hparams.accumulate_grad_batches,
-        log_gpu_memory=hparams.log_gpu_memory,
-        val_percent_check=hparams.val_percent_check,
-    )
+    if hparams.tpu_cores >= 1:
+        trainer = Trainer(
+            logger=setup_testube_logger(),
+            checkpoint_callback=True,
+            early_stop_callback=early_stop_callback,
+            default_save_path="experiments/",
+            distributed_backend=hparams.distributed_backend,
+            max_epochs=hparams.max_epochs,
+            min_epochs=hparams.min_epochs,
+            progress_bar_refresh_rate=10,
+            accumulate_grad_batches=hparams.accumulate_grad_batches,
+            val_percent_check=hparams.val_percent_check,
+            num_tpu_cores=hparams.tpu_cores,
+        )
+
+        
+    
+    else:
+        trainer = Trainer(
+            logger=setup_testube_logger(),
+            checkpoint_callback=True,
+            early_stop_callback=early_stop_callback,
+            default_save_path="experiments/",
+            gpus=hparams.gpus,
+            distributed_backend=hparams.distributed_backend,
+            use_amp=hparams.use_16bit,
+            max_epochs=hparams.max_epochs,
+            min_epochs=hparams.min_epochs,
+            accumulate_grad_batches=hparams.accumulate_grad_batches,
+            log_gpu_memory=hparams.log_gpu_memory,
+            val_percent_check=hparams.val_percent_check,
+        )
+
 
     # --------------------------------
     # 4 INIT MODEL CHECKPOINT CALLBACK
@@ -69,6 +88,8 @@ def main(hparams) -> None:
         mode=hparams.metric_mode,
     )
     trainer.checkpoint_callback = checkpoint_callback
+    #if hparams.gstore is not None:
+
 
     # ------------------------
     # 5 START TRAINING
@@ -106,7 +127,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--patience",
-        default=3,
+        default=5,
         type=int,
         help="Number of epochs with no improvement \
             after which training will be stopped.",
@@ -119,7 +140,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--max_epochs",
-        default=10,
+        default=100,
         type=int,
         help="Limits training to a max number number of epochs",
     )
@@ -157,6 +178,8 @@ if __name__ == "__main__":
         help="Uses the output of nvidia-smi to log GPU usage. \
             Might slow performance.",
     )
+    # tpu args
+    parser.add_argument("--tpu_cores", type=int, default=0, help="How many TPU Cores")
 
     parser.add_argument(
         "--val_percent_check",
@@ -165,10 +188,18 @@ if __name__ == "__main__":
         help="If you don't want to use the entire dev set (for debugging or \
             if it's huge), set how much of the dev set you want to use with this flag.",
     )
+    # logging args
+    parser.add_argument("--wandb", type=dict, default=None, help="Log Experiment with wandb. Takes dict {'experiment', 'run'}")
+
+    # bucket args
+    parser.add_argument("--gstore", type=str, default=None, help="Store Checkpoints in Google Bucket")
 
     # each LightningModule defines arguments relevant to it
     parser = GPT2LanguageModel.add_model_specific_args(parser)
     hparams = parser.parse_args()
+    if hparams.gstore is not None:
+        from utils import gs_checkpoint
+        print('Storing Checkpoints to {}'.format(hparams.gstore))
 
     # ---------------------
     # RUN TRAINING
