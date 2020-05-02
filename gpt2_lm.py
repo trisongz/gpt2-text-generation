@@ -264,11 +264,11 @@ class GPT2LanguageModel(pl.LightningModule):
         if self.on_gpu:
             loss_test = loss_test.cuda(loss_test.device.index)
 
-        if self.use_tpu:
-            loss_test = loss_test.detach().cpu().numpy()
+        #if self.use_tpu:
+        #    loss_test = loss_test.detach().cpu().numpy()
         
         # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
-        elif self.trainer.use_dp or self.trainer.use_ddp2:
+        if self.trainer.use_dp or self.trainer.use_ddp2:
             loss_test = loss_test.unsqueeze(0)
 
         output = OrderedDict({"test_loss": loss_test})
@@ -325,7 +325,8 @@ class GPT2LanguageModel(pl.LightningModule):
                 dataset=self._train_dataset,
                 sampler=sampler,
                 collate_fn=self.prepare_sample,
-                batch_size=self.hparams.batch_size
+                batch_size=self.hparams.batch_size,
+                num_workers=self.hparams.loader_workers,
             )
         
         else:
@@ -352,7 +353,8 @@ class GPT2LanguageModel(pl.LightningModule):
                 dataset=self._dev_dataset,
                 sampler=sampler,
                 collate_fn=self.prepare_sample,
-                batch_size=self.hparams.batch_size
+                batch_size=self.hparams.batch_size,
+                num_workers=self.hparams.loader_workers,
             )
         
         else:
@@ -379,7 +381,8 @@ class GPT2LanguageModel(pl.LightningModule):
                 dataset=self._test_dataset,
                 sampler=sampler,
                 collate_fn=self.prepare_sample,
-                batch_size=self.hparams.batch_size
+                batch_size=self.hparams.batch_size,
+                num_workers=self.hparams.loader_workers,
             )
         else:
             return DataLoader(
