@@ -35,6 +35,13 @@ class GPT2LanguageModel(pl.LightningModule):
         self.hparams = hparams
         self.batch_size = hparams.batch_size
         self.output_units = 768  # self.gpt2.state_dict()["ln_f.bias"].shape[0] --> bias from last layer of the GPT2 model
+
+        #tpu helper
+        self.use_tpu = False
+        if hparams.tpu_cores >= 1:
+            self.use_tpu = True
+            import torch_xla.core.xla_model as xm
+        
         # build model
         self.__build_model()
 
@@ -179,15 +186,18 @@ class GPT2LanguageModel(pl.LightningModule):
         """
         inputs = batch
         model_out = self.forward(**inputs)
-        loss_val = self.loss(model_out, inputs)
+        loss_train = self.loss(model_out, inputs)
 
+        if self.use_tpu:
+            loss_train = loss_train.detach().cpu().numpy()
+        
         # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
-        if self.trainer.use_dp or self.trainer.use_ddp2:
-            loss_val = loss_val.unsqueeze(0)
+        elif self.trainer.use_dp or self.trainer.use_ddp2:
+            loss_train = loss_train.unsqueeze(0)
 
-        tqdm_dict = {"train_loss": loss_val}
+        tqdm_dict = {"train_loss": loss_train}
         output = OrderedDict(
-            {"loss": loss_val, "progress_bar": tqdm_dict, "log": tqdm_dict}
+            {"loss": loss_train, "progress_bar": tqdm_dict, "log": tqdm_dict}
         )
 
         # can also return just a scalar instead of a dict (return loss_val)
@@ -205,9 +215,12 @@ class GPT2LanguageModel(pl.LightningModule):
 
         if self.on_gpu:
             loss_val = loss_val.cuda(loss_val.device.index)
+        
+        if self.use_tpu:
+            loss_val = loss_val.detach().cpu().numpy()
 
         # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
-        if self.trainer.use_dp or self.trainer.use_ddp2:
+        elif self.trainer.use_dp or self.trainer.use_ddp2:
             loss_val = loss_val.unsqueeze(0)
 
         output = OrderedDict({"val_loss": loss_val})
@@ -248,8 +261,11 @@ class GPT2LanguageModel(pl.LightningModule):
         if self.on_gpu:
             loss_test = loss_test.cuda(loss_test.device.index)
 
+        if self.use_tpu:
+            loss_test = loss_test.detach().cpu().numpy()
+        
         # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
-        if self.trainer.use_dp or self.trainer.use_ddp2:
+        elif self.trainer.use_dp or self.trainer.use_ddp2:
             loss_test = loss_test.unsqueeze(0)
 
         output = OrderedDict({"test_loss": loss_test})
@@ -272,6 +288,7 @@ class GPT2LanguageModel(pl.LightningModule):
                 test_loss = torch.mean(test_loss)
             test_loss_mean += test_loss
         test_loss_mean /= len(outputs)
+
         perplexity = torch.exp(test_loss_mean.clone().detach())
         tqdm_dict = {"test_loss": test_loss_mean, "perplexity": perplexity}
         result = {"progress_bar": tqdm_dict, "log": tqdm_dict, "perplexity": perplexity}
@@ -293,34 +310,78 @@ class GPT2LanguageModel(pl.LightningModule):
     def train_dataloader(self) -> DataLoader:
         """ Function that loads the train set. """
         self._train_dataset = self.__retrieve_dataset(val=False, test=False)[0]
-        return DataLoader(
-            dataset=self._train_dataset,
-            batch_size=self.hparams.batch_size,
-            collate_fn=self.prepare_sample,
-            num_workers=self.hparams.loader_workers,
-        )
+        sampler = None
+        if self.use_tpu:
+            sampler = torch.utils.data.distributed.DistributedSampler(
+                dataset=self._train_dataset,
+                num_replicas=xm.xrt_world_size(),
+                rank=xm.get_ordinal(),
+                shuffle=True
+            )
+            return DataLoader(
+                dataset=self._train_dataset,
+                sampler=sampler,
+                batch_size=self.hparams.batch_size
+            )
+        
+        else:
+            return DataLoader(
+                dataset=self._train_dataset,
+                batch_size=self.hparams.batch_size,
+                collate_fn=self.prepare_sample,
+                num_workers=self.hparams.loader_workers,
+            )
 
     @pl.data_loader
     def val_dataloader(self) -> DataLoader:
         """ Function that loads the validation set. """
         self._dev_dataset = self.__retrieve_dataset(train=False, test=False)[0]
-        return DataLoader(
-            dataset=self._dev_dataset,
-            batch_size=self.hparams.batch_size,
-            collate_fn=self.prepare_sample,
-            num_workers=self.hparams.loader_workers,
-        )
+        sampler = None
+        if self.use_tpu:
+            sampler = torch.utils.data.distributed.DistributedSampler(
+                dataset=self._train_dataset,
+                num_replicas=xm.xrt_world_size(),
+                rank=xm.get_ordinal(),
+                shuffle=True
+            )
+            return DataLoader(
+                dataset=self._train_dataset,
+                sampler=sampler,
+                batch_size=self.hparams.batch_size
+            )
+        
+        else:
+            return DataLoader(
+                dataset=self._dev_dataset,
+                batch_size=self.hparams.batch_size,
+                collate_fn=self.prepare_sample,
+                num_workers=self.hparams.loader_workers,
+            )
 
     @pl.data_loader
     def test_dataloader(self) -> DataLoader:
         """ Function that loads the validation set. """
         self._test_dataset = self.__retrieve_dataset(train=False, val=False)[0]
-        return DataLoader(
-            dataset=self._test_dataset,
-            batch_size=self.hparams.batch_size,
-            collate_fn=self.prepare_sample,
-            num_workers=self.hparams.loader_workers,
-        )
+        sampler = None
+        if self.use_tpu:
+            sampler = torch.utils.data.distributed.DistributedSampler(
+                dataset=self._train_dataset,
+                num_replicas=xm.xrt_world_size(),
+                rank=xm.get_ordinal(),
+                shuffle=True
+            )
+            return DataLoader(
+                dataset=self._train_dataset,
+                sampler=sampler,
+                batch_size=self.hparams.batch_size
+            )
+        else:
+            return DataLoader(
+                dataset=self._test_dataset,
+                batch_size=self.hparams.batch_size,
+                collate_fn=self.prepare_sample,
+                num_workers=self.hparams.loader_workers,
+            )
 
     @classmethod
     def add_model_specific_args(
@@ -343,19 +404,19 @@ class GPT2LanguageModel(pl.LightningModule):
             help="If conditional LM - specify label to read.",
         )
         parser.add_argument(
-            "--train_csv",
+            "--train_fn",
             default="data/train_data.csv",
             type=str,
             help="Path to the file containing the train data.",
         )
         parser.add_argument(
-            "--dev_csv",
+            "--dev_fn",
             default="data/valid_data.csv",
             type=str,
             help="Path to the file containing the dev data.",
         )
         parser.add_argument(
-            "--test_csv",
+            "--test_fn",
             default="data/valid_data.csv",
             type=str,
             help="Path to the file containing the dev data.",

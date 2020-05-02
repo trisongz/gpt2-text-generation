@@ -40,6 +40,13 @@ parser.add_argument(
     default='text',
     help='Key for Target Text if not the key is not text',
 )
+parser.add_argument(
+    '--format',
+    dest='format',
+    type=str,
+    default='jsonl',
+    help='Output file format',
+)
 
 args = parser.parse_args()
 
@@ -51,29 +58,41 @@ with tf.io.gfile.GFile(args.input_fn, 'r+') as f:
 #assert args.text_field in items
 #assert args.label_field in items
 
-train_fn = tf.io.gfile.GFile(('{}_train.csv'.format(args.output_fn)), 'w+')
-train_fn.write('label,text\n')
+train_fn = tf.io.gfile.GFile(('{}_train.{}'.format(args.output_fn, args.format)), 'w+')
+test_fn = tf.io.gfile.GFile(('{}_test.{}'.format(args.output_fn, args.format)), 'w+')
+val_fn = tf.io.gfile.GFile(('{}_val.{}'.format(args.output_fn, args.format)), 'w+')
 
-test_fn = tf.io.gfile.GFile(('{}_test.csv'.format(args.output_fn)), 'w+')
-test_fn.write('label,text\n')
+if args.format == 'csv':
+    train_fn.write('label,text\n')
+    test_fn.write('label,text\n')
+    val_fn.write('label,text\n')
 
-val_fn = tf.io.gfile.GFile(('{}_val.csv'.format(args.output_fn)), 'w+')
-val_fn.write('label,text\n')
+
 
 for i, item in enumerate(tqdm(items)):
-    label = item[args.label_field]
-    text = item[args.text_field]
-    
-    result = '{},{}\n'.format(label, text)
+    if args.format == 'jsonl':
+        result = {
+            'label': item[args.label_field],
+            'text': item[args.text_field]
+        }
+        if i % 8 == 0:
+            val_fn.write(json.dumps(result) + '\n')
+        elif i % 12 == 0:
+            test_fn.write(json.dumps(result) + '\n')
+        else:
+            train_fn.write(json.dumps(result) + '\n')
 
-    if i % 8 == 0:
-        val_fn.write(result)
-    
-    elif i % 12 == 0:
-        test_fn.write(result)
-    
-    else:
-        train_fn.write(result)
+    elif args.format == 'csv':
+        label = item[args.label_field]
+        text = item[args.text_field]
+        result = '{},{}\n'.format(label, text)
+
+        if i % 8 == 0:
+            val_fn.write(result)
+        elif i % 12 == 0:
+            test_fn.write(result)
+        else:
+            train_fn.write(result)
 
 train_fn.close()
 test_fn.close()

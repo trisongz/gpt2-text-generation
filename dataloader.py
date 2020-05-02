@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
-
+import json
 from test_tube import HyperOptArgumentParser
 from torchnlp.datasets.dataset import Dataset
 
@@ -21,6 +21,19 @@ def collate_dicts(text: list, label_text: list) -> dict:
     return collated_dataset
 
 
+def collate_jsonl(items, labels):
+    """ Converts a dict of items + list of labels into a dictionary. """
+    collated_dataset = []
+    for i, item in enumerate(items):
+        if len(labels) == 1:
+            joined_text = item[labels[0]]
+        
+        elif len(labels) == 2:
+            joined_text = "<LABEL> " + item[labels[1]] + "<TARGET> " + item[labels[0]]
+        
+        collated_dataset.append({"text": joined_text})
+    return collated_dataset
+
 def text_dataset(
     hparams: HyperOptArgumentParser, train=True, val=True, test=True
 ):
@@ -36,22 +49,35 @@ def text_dataset(
     """
 
     def load_dataset(path):
-        df = pd.read_csv(path)
-        text = list(df.text)
-        if hparams.label is not None:
-            label_name = hparams.label
-            label_text = list(df[label_name])
-            return Dataset(collate_dicts(text, label_text))
+        if path.endswith('.jsonl'):
+            labels = ['text']
+            if hparams.label is not None:
+                label_name = hparams.label
+                labels.append(label_name)
+            
+            with open(path, 'r+') as f:
+                items = [json.loads(l) for i, l in enumerate(f)]
+            
+            return Dataset(collate_jsonl(items, labels))
 
-        else:
-            return Dataset(collate_lists(text))
+        
+        elif path.endswith('.csv'):
+            df = pd.read_csv(path)
+            text = list(df.text)
+            if hparams.label is not None:
+                label_name = hparams.label
+                label_text = list(df[label_name])
+                return Dataset(collate_dicts(text, label_text))
+
+            else:
+                return Dataset(collate_lists(text))
 
     func_out = []
     if train:
-        func_out.append(load_dataset(hparams.train_csv))
+        func_out.append(load_dataset(hparams.train_fn))
     if val:
-        func_out.append(load_dataset(hparams.dev_csv))
+        func_out.append(load_dataset(hparams.dev_fn))
     if test:
-        func_out.append(load_dataset(hparams.test_csv))
+        func_out.append(load_dataset(hparams.test_fn))
 
     return tuple(func_out)
