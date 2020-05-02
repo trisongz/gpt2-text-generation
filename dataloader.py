@@ -29,7 +29,7 @@ def collate_jsonl(items, labels):
             joined_text = item[labels[0]]
         
         elif len(labels) == 2:
-            joined_text = "<LABEL> " + item[labels[1]] + "<TARGET> " + item[labels[0]]
+            joined_text = "<LABEL> " + str(item[labels[1]]) + "<TARGET> " + str(item[labels[0]])
         
         collated_dataset.append({"text": joined_text})
     return collated_dataset

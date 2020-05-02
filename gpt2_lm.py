@@ -189,18 +189,18 @@ class GPT2LanguageModel(pl.LightningModule):
         """
         inputs = batch
         model_out = self.forward(**inputs)
-        loss_train = self.loss(model_out, inputs)
+        loss_val = self.loss(model_out, inputs)
 
         if self.use_tpu:
-            loss_train = loss_train.detach().cpu().numpy()
+            loss_val = loss_val.detach().cpu().numpy()
         
         # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
         elif self.trainer.use_dp or self.trainer.use_ddp2:
-            loss_train = loss_train.unsqueeze(0)
+            loss_val = loss_val.unsqueeze(0).cpu().numpy()
 
-        tqdm_dict = {"train_loss": loss_train}
+        tqdm_dict = {"train_loss": loss_val}
         output = OrderedDict(
-            {"loss": loss_train, "progress_bar": tqdm_dict, "log": tqdm_dict}
+            {"loss": loss_val, "progress_bar": tqdm_dict, "log": tqdm_dict}
         )
 
         # can also return just a scalar instead of a dict (return loss_val)
@@ -324,6 +324,7 @@ class GPT2LanguageModel(pl.LightningModule):
             return DataLoader(
                 dataset=self._train_dataset,
                 sampler=sampler,
+                collate_fn=self.prepare_sample,
                 batch_size=self.hparams.batch_size
             )
         
@@ -350,6 +351,7 @@ class GPT2LanguageModel(pl.LightningModule):
             return DataLoader(
                 dataset=self._dev_dataset,
                 sampler=sampler,
+                collate_fn=self.prepare_sample,
                 batch_size=self.hparams.batch_size
             )
         
@@ -376,6 +378,7 @@ class GPT2LanguageModel(pl.LightningModule):
             return DataLoader(
                 dataset=self._test_dataset,
                 sampler=sampler,
+                collate_fn=self.prepare_sample,
                 batch_size=self.hparams.batch_size
             )
         else:
