@@ -339,13 +339,13 @@ class GPT2LanguageModel(pl.LightningModule):
         sampler = None
         if self.use_tpu:
             sampler = torch.utils.data.distributed.DistributedSampler(
-                dataset=self._train_dataset,
+                dataset=self._dev_dataset,
                 num_replicas=xm.xrt_world_size(),
                 rank=xm.get_ordinal(),
                 shuffle=True
             )
             return DataLoader(
-                dataset=self._train_dataset,
+                dataset=self._dev_dataset,
                 sampler=sampler,
                 batch_size=self.hparams.batch_size
             )
@@ -365,13 +365,13 @@ class GPT2LanguageModel(pl.LightningModule):
         sampler = None
         if self.use_tpu:
             sampler = torch.utils.data.distributed.DistributedSampler(
-                dataset=self._train_dataset,
+                dataset=self._test_dataset,
                 num_replicas=xm.xrt_world_size(),
                 rank=xm.get_ordinal(),
                 shuffle=True
             )
             return DataLoader(
-                dataset=self._train_dataset,
+                dataset=self._test_dataset,
                 sampler=sampler,
                 batch_size=self.hparams.batch_size
             )
