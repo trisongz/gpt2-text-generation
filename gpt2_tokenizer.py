@@ -17,12 +17,16 @@ class GPT2TextEncoder(TextEncoder):
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model)
         self.stoi = self.tokenizer.encoder
         self.itos = self.tokenizer.decoder
-        special_tokens_dict = {'pad_token': '<PAD>', 'label': '<LABEL>', 'target': '<TARGET>'}
+        special_tokens_dict = {'pad_token': '<PAD>', 'additional_special_tokens': ['<LABEL>', '<TARGET>']}
         num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
         print('We have added', num_added_toks, 'tokens')
         # num_added_toks = self.tokenizer.add_tokens(['<END-VERSE>'])
         # print('We have added', num_added_toks, 'tokens')
 
+    @property
+    def special_index(self) -> int:
+        """ Returns the index used for the additional special tokens. """
+        return self.tokenizer.additional_special_tokens_ids
 
     @property
     def unk_index(self) -> int:

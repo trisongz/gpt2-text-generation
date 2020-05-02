@@ -48,8 +48,8 @@ with tf.io.gfile.GFile(args.input_fn, 'r+') as f:
     total_items = len(items)
     print('Loaded {} Items'.format(total_items))
 
-assert args.text_field in items
-assert args.label_field in items
+#assert args.text_field in items
+#assert args.label_field in items
 
 train_fn = tf.io.gfile.GFile(('{}_train.csv'.format(args.output_fn)), 'w+')
 train_fn.write('label,text\n')

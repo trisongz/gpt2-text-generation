@@ -234,6 +234,48 @@ class GPT2LanguageModel(pl.LightningModule):
         tqdm_dict = {"val_loss": val_loss_mean, "perplexity": perplexity}
         result = {"progress_bar": tqdm_dict, "log": tqdm_dict, "perplexity": perplexity}
         return result
+    
+    def test_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
+        """ Similar to the training step but with the model in test mode.
+
+        Returns:
+            - dictionary passed to the test function.
+        """
+        inputs = batch
+        model_out = self.forward(**inputs)
+        loss_test = self.loss(model_out, inputs)
+
+        if self.on_gpu:
+            loss_test = loss_test.cuda(loss_test.device.index)
+
+        # in DP mode (default) make sure if result is scalar, there's another dim in the beginning
+        if self.trainer.use_dp or self.trainer.use_ddp2:
+            loss_test = loss_test.unsqueeze(0)
+
+        output = OrderedDict({"test_loss": loss_test})
+
+        # can also return just a scalar instead of a dict (return loss_val)
+        return output
+    
+    def test_end(self, outputs: list) -> dict:
+        """ Function that takes as input a list of dictionaries returned by the test_step
+        function and measures the model performance accross the entire test set.
+        
+        Returns:
+            - Dictionary with metrics to be added to the lightning logger.  
+        """
+        test_loss_mean = 0
+        for output in outputs:
+            test_loss = output["test_loss"]
+            # reduce manually when using dp
+            if self.trainer.use_dp or self.trainer.use_ddp2:
+                test_loss = torch.mean(test_loss)
+            test_loss_mean += test_loss
+        test_loss_mean /= len(outputs)
+        perplexity = torch.exp(test_loss_mean.clone().detach())
+        tqdm_dict = {"test_loss": test_loss_mean, "perplexity": perplexity}
+        result = {"progress_bar": tqdm_dict, "log": tqdm_dict, "perplexity": perplexity}
+        return result
 
     def configure_optimizers(self):
         """ Sets Learning rate for different parameter groups. """
